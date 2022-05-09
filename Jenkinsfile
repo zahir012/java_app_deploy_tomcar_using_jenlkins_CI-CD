@@ -1,62 +1,74 @@
 pipeline {
     agent any
-	
-	  tools
-    {
-       maven "Maven"
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "MAVEN"
     }
- stages {
-      stage('checkout') {
-           steps {
-             
-                git branch: 'master', url: 'https://github.com/devops4solutions/CI-CD-using-Docker.git'
-             
-          }
+
+    stages {
+        stage('Check SCM') {
+            steps {
+                // Get some code from a GitHub repository
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/zahir012/java_app_deploy_tomcar_using_jenlkins_CI-CD.git']]])
+
+            }
+        }    
+        
+        stage('Build maven package') {
+            steps {
+                sh 'mvn package'   
+            }
         }
-	 stage('Execute Maven') {
-           steps {
-             
-                sh 'mvn package'             
-          }
+
+        stage('Build docker image') {
+            
+            steps {
+                
+                script {
+                    
+                    sh 'docker build -t zahirul012/java-web-app-2.0 .'
+                }
+            }
+        }
+           
+        stage('Deploy to docker') {
+            
+            steps {
+                
+                script {
+                    
+                    sh 'docker run -d --name myweb -p 8989:8080 zahirul012/java-web-app-2.0'
+                }
+            }
+        }    
+        
+        stage('Push dokcer image to docker hub') {
+            
+            steps {
+                
+                script {
+                    
+                    withCredentials([string(credentialsId: 'docker', variable: 'docker')]) {
+                        
+                    sh 'docker login -u zahirul012 -p ${docker}'
+                    
+}                  
+                    sh 'docker push zahirul012/java-web-app-2.0'
+                    
+                }
+            }
+     
         }
         
-
-  stage('Docker Build and Tag') {
-           steps {
-              
-                sh 'docker build -t samplewebapp:latest .' 
-                sh 'docker tag samplewebapp nikhilnidhi/samplewebapp:latest'
-                //sh 'docker tag samplewebapp nikhilnidhi/samplewebapp:$BUILD_NUMBER'
-               
-          }
-        }
-     
-  stage('Publish image to Docker Hub') {
-          
-            steps {
-        withDockerRegistry([ credentialsId: "dockerHub", url: "" ]) {
-          sh  'docker push nikhilnidhi/samplewebapp:latest'
-        //  sh  'docker push nikhilnidhi/samplewebapp:$BUILD_NUMBER' 
-        }
-                  
-          }
-        }
-     
-      stage('Run Docker container on Jenkins Agent') {
-             
-            steps 
-			{
-                sh "docker run -d -p 8003:8080 nikhilnidhi/samplewebapp"
- 
-            }
-        }
- stage('Run Docker container on remote hosts') {
-             
-            steps {
-                sh "docker -H ssh://jenkins@172.31.28.25 run -d -p 8003:8080 nikhilnidhi/samplewebapp"
- 
-            }
-        }
+        
     }
-	}
+        post {
+            
+            always {
+                
+                sh 'docker logout'
+            }
+       }
     
+}
